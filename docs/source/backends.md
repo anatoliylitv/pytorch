@@ -118,6 +118,10 @@ These backends include:
 ```
 
 ```{eval-rst}
+.. autofunction:: torch.backends.cuda.is_ck_sdpa_available
+```
+
+```{eval-rst}
 .. autofunction:: torch.backends.cuda.preferred_linalg_library
 ```
 
@@ -369,6 +373,7 @@ These backends include:
 ```{eval-rst}
 .. py:module:: torch.backends.kleidiai
 
+.. autofunction:: torch.backends.kleidiai.is_available
 ```
 
 ## torch.backends.opt_einsum
