@@ -39,12 +39,18 @@ namespace {
 // elsewhere. gfx942: the new kernels win 1.4-2.2x at 216 pixels/SM, tie at
 // 431, and lose from 1010 up. gfx950: they win up to 1.9x at 384 pixels/SM;
 // at 512 they trail by up to 14% with N*C <= 32 and win 1.2-1.4x with 256
-// planes; from 768 up they mostly tie or lose.
+// planes; from 768 up they mostly tie or lose. gfx1250: they win 1.1-4.3x with
+// N*C >= 16 up to 512 pixels/SM and tie with fewer planes; at 768 they win
+// upsampling by 1.5-1.7x but lose downsampling by up to 25%.
 int64_t plane_kernel_min_pixels_per_sm(
     [[maybe_unused]] const cudaDeviceProp* props) {
 #ifdef USE_ROCM
-  if (c10::basic_string_view<char>(props->gcnArchName).starts_with("gfx950")) {
+  const c10::basic_string_view<char> arch(props->gcnArchName);
+  if (arch.starts_with("gfx950")) {
     return 512;
+  }
+  if (arch.starts_with("gfx1250")) {
+    return 768;
   }
 #endif
   return 256;
