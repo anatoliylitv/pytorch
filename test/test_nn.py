@@ -9631,6 +9631,8 @@ class TestNNDeviceType(NNTestCase):
         subtest(((7, 5), (13, 11), (None, None)), name="mild_upsample"),
         subtest(((24, 32), (12, 16), (None, None)), name="downsample"),      # atomics/addr=1
         subtest(((13, 11), (7, 5), (None, None)), name="mild_downsample"),
+        subtest(((10, 10), (8, 8), (None, None)), name="ratio_2_56"),
+        subtest(((10, 10), (12, 12), (None, None)), name="ratio_5_76"),
         subtest(((9, 10), (9, 31), (None, None)), name="anisotropic"),
         # scales are forward scale_factors; 2.0 matches the 8->16 size-based scale.
         subtest(((8, 8), (16, 16), (2.0, 2.0)), name="explicit_scales"),
@@ -9640,8 +9642,9 @@ class TestNNDeviceType(NNTestCase):
     ):
         # C=16 so channels_last takes the NHWC backward kernels (threshold is
         # channels >= 4). Spatial sizes straddle the ROCm gather/scatter
-        # heuristic (K=6 atomics/addr). NaN-prefilled grad_input checks every
-        # element is written (gather) or correctly zeroed then scattered.
+        # cuts (6 atomics/addr; on gfx1250 1.5 for 16-bit and 5 for fp32).
+        # NaN-prefilled grad_input checks every element is written (gather) or
+        # correctly zeroed then scattered.
         n, c = 2, 16
         input_size = [n, c, *input_hw]
         output_size = list(output_hw)

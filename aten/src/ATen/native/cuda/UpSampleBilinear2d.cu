@@ -129,11 +129,20 @@ __global__ void upsample_bilinear2d_nhwc_out_frame(
 }
 
 #ifdef USE_ROCM
-// Prefer gather on channels_last when 4*o_numel/i_numel is high (contended
-// atomics). One cutoff is shared by all ROCm architectures: gather wins above
-// ~6 atomics/addr and loses below ~5 on the parts measured so far. It can be
-// tuned for individual architectures later.
-constexpr int64_t kNhwcGatherMinContributions = 6;
+// Prefer gather on channels_last when 4*o_numel/i_numel (atomic adds per
+// grad_input address) is high. Returned in half-steps, so 12 means 6 adds.
+// Gather wins above ~6 adds/addr and loses below ~5 on most parts measured.
+// gfx1250: 16-bit gather wins from ~1.5 adds/addr, losing below that only on
+// large inputs; fp32 gather loses up to 2.5x below 5 adds/addr on large
+// inputs and wins from ~5.8.
+int64_t nhwc_gather_min_half_contributions(at::ScalarType dtype) {
+  const std::string_view arch(
+      at::cuda::getCurrentDeviceProperties()->gcnArchName);
+  if (arch.starts_with("gfx1250")) {
+    return (dtype == at::kHalf || dtype == at::kBFloat16) ? 3 : 10;
+  }
+  return 12;
+}
 
 // Helper function to compute output pixel range that can contribute to input pixel
 template <typename accscalar_t>
@@ -536,8 +545,9 @@ static void upsample_bilinear2d_backward_out_cuda_template(
 #ifdef USE_ROCM
   // Prefer NHWC gather when atomics/addr (= 4 * o_numel / i_numel) is high.
   const bool use_nhwc_gather = use_nhwc &&
-      (4 * grad_output_.numel() >=
-       kNhwcGatherMinContributions * grad_input.numel());
+      (8 * grad_output_.numel() >=
+       nhwc_gather_min_half_contributions(grad_output_.scalar_type()) *
+           grad_input.numel());
 #else
   constexpr bool use_nhwc_gather = false;
 #endif
